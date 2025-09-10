@@ -1,5 +1,9 @@
 import { useState } from "react";
-import OpenAI from "openai";
+import {
+  createEmbedding,
+  createChatCompletion,
+  type ChatMessage,
+} from "./utils/openai-api";
 
 // Types pour les chunks
 type Chunk = {
@@ -39,12 +43,6 @@ console.log("Configuration IA:", {
   baseURL: baseURL || "Défaut (OpenAI)",
   embeddingModel,
   chatModel,
-});
-
-const client = new OpenAI({
-  apiKey,
-  baseURL,
-  dangerouslyAllowBrowser: true,
 });
 
 // Fonction pour calculer la similarité cosinus entre deux vecteurs
@@ -87,9 +85,9 @@ async function searchRelevantChunks(
 ): Promise<Chunk[]> {
   try {
     // Générer l'embedding de la requête
-    const queryEmbedding = await client.embeddings.create({
-      model: embeddingModel,
-      input: query,
+    const queryEmbeddingVector = await createEmbedding(query, embeddingModel, {
+      apiKey,
+      baseURL,
     });
 
     // Charger tous les chunks
@@ -103,10 +101,7 @@ async function searchRelevantChunks(
     // Calculer la similarité pour chaque chunk
     const similarities = chunks.map((chunk) => ({
       chunk,
-      similarity: cosineSimilarity(
-        queryEmbedding.data[0].embedding,
-        chunk.embedding
-      ),
+      similarity: cosineSimilarity(queryEmbeddingVector, chunk.embedding),
     }));
 
     // Trier par similarité décroissante et prendre les meilleurs
@@ -121,9 +116,7 @@ async function searchRelevantChunks(
 
 function App() {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<
-    { role: "user" | "assistant"; content: string }[]
-  >([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -177,9 +170,8 @@ ${contextText}
 Utilise UNIQUEMENT les informations fournies ci-dessus pour répondre à la question de l'utilisateur. Si la réponse n'est pas dans la documentation fournie, dis-le clairement.`;
 
       // 4. Appeler l'API IA avec le contexte
-      const res = await client.chat.completions.create({
-        model: chatModel,
-        messages: [
+      const answer = await createChatCompletion(
+        [
           {
             role: "system",
             content: systemPrompt,
@@ -187,9 +179,13 @@ Utilise UNIQUEMENT les informations fournies ci-dessus pour répondre à la ques
           ...messages,
           { role: "user", content: input },
         ],
-      });
+        chatModel,
+        {
+          apiKey,
+          baseURL,
+        }
+      );
 
-      const answer = res.choices[0].message?.content || "";
       setMessages([
         ...messages,
         { role: "user", content: input },

@@ -1,7 +1,6 @@
 import { readdir, readFile, writeFile } from "fs/promises";
 import { join, extname } from "path";
 import { v4 as uuidv4 } from "uuid";
-import OpenAI from "openai";
 
 // Types selon la spécification
 type Chunk = {
@@ -32,11 +31,6 @@ const embeddingModel =
 
 console.log("apiKey: ", apiKey);
 console.log("baseURL: ", baseURL);
-// Initialisation du client IA
-const openai = new OpenAI({
-  apiKey,
-  baseURL,
-});
 
 /**
  * Découpe un texte en chunks selon les règles de la spécification
@@ -92,12 +86,44 @@ function splitIntoChunks(text: string): string[] {
  */
 async function generateEmbedding(text: string): Promise<number[]> {
   try {
-    const response = await openai.embeddings.create({
-      model: embeddingModel,
-      input: text,
+    // Construire l'URL en évitant la duplication de /v1
+    let url = baseURL || "https://api.openai.com";
+    if (!url.endsWith("/v1")) {
+      url += "/v1";
+    }
+    url += "/embeddings";
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        input: text,
+        model: embeddingModel,
+      }),
     });
 
-    return response.data[0].embedding;
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Erreur API (${response.status}): ${errorText}`);
+    }
+
+    const rawData = await response.json();
+
+    // Vérifier si la structure correspond à OpenAI
+    if (rawData.data && rawData.data[0] && rawData.data[0].embedding) {
+      return rawData.data[0].embedding;
+    }
+    // Structure alternative pour LM Studio ou autres APIs
+    else if (rawData.embedding && Array.isArray(rawData.embedding)) {
+      return rawData.embedding;
+    } else {
+      throw new Error(
+        `Structure de réponse inattendue: ${JSON.stringify(rawData)}`
+      );
+    }
   } catch (error) {
     console.error("Erreur lors de la génération de l'embedding:", error);
     throw error;
