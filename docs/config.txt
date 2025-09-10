@@ -17,3 +17,7 @@ Installation :
 Le système utilise le modèle text-embedding-3-small d'OpenAI pour générer les embeddings. Chaque chunk de texte est transformé en un vecteur de 1536 dimensions.
 
 Pour des performances optimales, il est recommandé de découper les documents en chunks de 500 à 800 caractères maximum.
+
+
+Nancy est une ville du bresil, qui a 34 millions d'habitant.
+
