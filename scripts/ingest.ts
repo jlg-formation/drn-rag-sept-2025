@@ -19,9 +19,23 @@ const CHUNK_MIN_SIZE = 500;
 const CHUNK_MAX_SIZE = 800;
 const SUPPORTED_EXTENSIONS = [".txt", ".md"];
 
-// Initialisation d'OpenAI
+// Configuration du client IA (OpenAI ou LM Studio)
+const apiKey =
+  process.env.VITE_OPENAI_API_KEY ||
+  process.env.OPENAI_API_KEY ||
+  "sk-fake-key-for-lm-studio";
+const baseURL = process.env.VITE_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL;
+const embeddingModel =
+  process.env.VITE_EMBEDDING_MODEL ||
+  process.env.EMBEDDING_MODEL ||
+  "text-embedding-3-small";
+
+console.log("apiKey: ", apiKey);
+console.log("baseURL: ", baseURL);
+// Initialisation du client IA
 const openai = new OpenAI({
-  apiKey: process.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+  apiKey,
+  baseURL,
 });
 
 /**
@@ -79,7 +93,7 @@ function splitIntoChunks(text: string): string[] {
 async function generateEmbedding(text: string): Promise<number[]> {
   try {
     const response = await openai.embeddings.create({
-      model: "text-embedding-3-small",
+      model: embeddingModel,
       input: text,
     });
 
@@ -137,9 +151,18 @@ async function main() {
   try {
     console.log("🚀 Début de l'ingestion RAG...\n");
 
-    // Vérification de la clé API
-    if (!process.env.VITE_OPENAI_API_KEY && !process.env.OPENAI_API_KEY) {
-      throw new Error("Clé OpenAI manquante. Vérifiez votre fichier .env");
+    // Vérification de la configuration
+    console.log(`Configuration IA :`);
+    console.log(
+      `- API Key: ${
+        apiKey ? `${apiKey.substring(0, 10)}...` : "Non configurée"
+      }`
+    );
+    console.log(`- Base URL: ${baseURL || "Défaut (OpenAI)"}`);
+    console.log(`- Modèle d'embedding: ${embeddingModel}\n`);
+
+    if (!apiKey) {
+      throw new Error("Clé API manquante. Vérifiez votre fichier .env");
     }
 
     // Lecture du dossier docs/

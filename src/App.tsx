@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import OpenAI from "openai";
 
 // Types pour les chunks
@@ -10,11 +10,40 @@ type Chunk = {
   position: number;
 };
 
-const openaiKey = import.meta.env.VITE_OPENAI_API_KEY;
-console.log("openaiKey: ", openaiKey);
+// Configuration du client IA (OpenAI ou LM Studio)
+const apiKey =
+  localStorage.getItem("OPENAI_KEY") ||
+  import.meta.env.VITE_OPENAI_API_KEY ||
+  "sk-fake-key-for-lm-studio";
+console.log("apiKey: ", apiKey);
+
+const baseURL =
+  localStorage.getItem("OPENAI_BASE_URL") ||
+  import.meta.env.VITE_OPENAI_BASE_URL;
+console.log("baseURL: ", baseURL);
+
+const embeddingModel =
+  localStorage.getItem("EMBEDDING_MODEL") ||
+  import.meta.env.VITE_EMBEDDING_MODEL ||
+  "text-embedding-3-small";
+console.log("embeddingModel: ", embeddingModel);
+
+const chatModel =
+  localStorage.getItem("CHAT_MODEL") ||
+  import.meta.env.VITE_CHAT_MODEL ||
+  "gpt-4o-mini";
+console.log("chatModel: ", chatModel);
+
+console.log("Configuration IA:", {
+  apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : "Non configurée",
+  baseURL: baseURL || "Défaut (OpenAI)",
+  embeddingModel,
+  chatModel,
+});
 
 const client = new OpenAI({
-  apiKey: localStorage.getItem("OPENAI_KEY") || openaiKey,
+  apiKey,
+  baseURL,
   dangerouslyAllowBrowser: true,
 });
 
@@ -59,7 +88,7 @@ async function searchRelevantChunks(
   try {
     // Générer l'embedding de la requête
     const queryEmbedding = await client.embeddings.create({
-      model: "text-embedding-3-small",
+      model: embeddingModel,
       input: query,
     });
 
@@ -96,6 +125,24 @@ function App() {
     { role: "user" | "assistant"; content: string }[]
   >([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Configuration IA
+  const [localApiKey, setLocalApiKey] = useState(apiKey);
+  const [localBaseURL, setLocalBaseURL] = useState(baseURL || "");
+  const [localEmbeddingModel, setLocalEmbeddingModel] =
+    useState(embeddingModel);
+  const [localChatModel, setLocalChatModel] = useState(chatModel);
+
+  const saveSettings = () => {
+    localStorage.setItem("OPENAI_KEY", localApiKey);
+    localStorage.setItem("OPENAI_BASE_URL", localBaseURL);
+    localStorage.setItem("EMBEDDING_MODEL", localEmbeddingModel);
+    localStorage.setItem("CHAT_MODEL", localChatModel);
+    setShowSettings(false);
+    // Recharger la page pour appliquer les nouveaux paramètres
+    window.location.reload();
+  };
 
   const ask = async () => {
     if (!input.trim()) return;
@@ -129,9 +176,9 @@ ${contextText}
 
 Utilise UNIQUEMENT les informations fournies ci-dessus pour répondre à la question de l'utilisateur. Si la réponse n'est pas dans la documentation fournie, dis-le clairement.`;
 
-      // 4. Appeler l'API OpenAI avec le contexte
+      // 4. Appeler l'API IA avec le contexte
       const res = await client.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: chatModel,
         messages: [
           {
             role: "system",
@@ -170,13 +217,118 @@ Utilise UNIQUEMENT les informations fournies ci-dessus pour répondre à la ques
     <div className="flex flex-col h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200 p-4">
-        <h1 className="text-2xl font-bold text-gray-800 text-center">
-          Assistant RAG
-        </h1>
-        <p className="text-sm text-gray-600 text-center mt-1">
-          Posez vos questions, je réponds avec la documentation
-        </p>
+        <div className="flex items-center justify-between max-w-4xl mx-auto">
+          <div className="text-center flex-1">
+            <h1 className="text-2xl font-bold text-gray-800">Assistant RAG</h1>
+            <p className="text-sm text-gray-600 mt-1">
+              Posez vos questions, je réponds avec la documentation
+            </p>
+          </div>
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="ml-4 p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Paramètres IA"
+          >
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
+
+      {/* Panneau de configuration */}
+      {showSettings && (
+        <div className="bg-white border-b border-gray-200 p-4 shadow-sm">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">
+              ⚙️ Configuration IA
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  URL de base (pour LM Studio)
+                </label>
+                <input
+                  type="text"
+                  value={localBaseURL}
+                  onChange={(e) => setLocalBaseURL(e.target.value)}
+                  placeholder="http://localhost:1234/v1 (optionnel)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Laissez vide pour utiliser OpenAI
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Clé API
+                </label>
+                <input
+                  type="password"
+                  value={localApiKey}
+                  onChange={(e) => setLocalApiKey(e.target.value)}
+                  placeholder="sk-... ou lm-studio"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Modèle d'embedding
+                </label>
+                <input
+                  type="text"
+                  value={localEmbeddingModel}
+                  onChange={(e) => setLocalEmbeddingModel(e.target.value)}
+                  placeholder="text-embedding-3-small"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Modèle de chat
+                </label>
+                <input
+                  type="text"
+                  value={localChatModel}
+                  onChange={(e) => setLocalChatModel(e.target.value)}
+                  placeholder="gpt-4o-mini"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end mt-4 space-x-2">
+              <button
+                onClick={() => setShowSettings(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={saveSettings}
+                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+              >
+                Sauvegarder
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages Container */}
       <div className="flex-1 overflow-hidden flex flex-col max-w-4xl mx-auto w-full">
