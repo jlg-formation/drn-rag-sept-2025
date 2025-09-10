@@ -1,0 +1,19 @@
+Configuration technique du système
+
+Ce document décrit la configuration technique nécessaire pour faire fonctionner le système RAG.
+
+Prérequis :
+- Node.js version 18 ou supérieure
+- Bun runtime
+- Clé API OpenAI valide
+- TypeScript pour le développement
+
+Installation :
+1. Cloner le repository
+2. Installer les dépendances avec bun install
+3. Configurer la variable d'environnement OPENAI_API_KEY
+4. Exécuter le script d'ingestion pour préparer les données
+
+Le système utilise le modèle text-embedding-3-small d'OpenAI pour générer les embeddings. Chaque chunk de texte est transformé en un vecteur de 1536 dimensions.
+
+Pour des performances optimales, il est recommandé de découper les documents en chunks de 500 à 800 caractères maximum.
